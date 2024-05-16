@@ -1,0 +1,63 @@
+// SPDX-FileCopyrightText: 2024 Friedrich-Alexander-Universitat Erlangen-Nurnberg
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
+// Describing a Trees pipeline
+pipeline TreesPipeline {
+
+    TreesExtractor -> TreesTextFileInterpreter;
+
+    TreesTextFileInterpreter
+        -> TreesCSVInterpreter 
+        -> TreesTableInterpreter
+        -> TreesLoader;
+
+    block TreesExtractor oftype HttpExtractor {
+        url: "https://opendata.rhein-kreis-neuss.de/api/v2/catalog/datasets/stadt-neuss-herbstpflanzung-2023/exports/csv";
+    }
+
+    block TreesTextFileInterpreter oftype TextFileInterpreter { }
+
+    block TreesCSVInterpreter oftype CSVInterpreter {
+        delimiter: ';';
+    }
+ 
+    block TreesTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "lfd_nr" oftype integer, 
+            "stadtteil" oftype stadtteilConstraint,
+            "standort" oftype text,
+            "baumart_botanisch" oftype text,
+           // "baumart_deutsch" oftype text,
+            "id" oftype idConstraint,
+            "baumfamilie" oftype text
+        ];
+    }
+
+    block TreesLoader oftype SQLiteLoader {
+        table: "trees";
+        file: "./trees.sqlite";
+    }
+
+    valuetype stadtteilConstraint oftype text {
+        constraints: [
+            StartsWithFurth,
+        ];
+    }
+    //  This constraint works on text value types and requires values to match a given regular expression in order to be valid.
+    constraint StartsWithFurth on text:
+        value matches /^Furth-.*$/;
+
+    valuetype idConstraint oftype text {
+        constraints: [
+            ValueFormat,
+        ];
+    }
+    //  This constraint works on text value types and requires values to match a given regular expression in order to be valid.
+    constraint ValueFormat on text:
+        value matches /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/;
+
+    
+
+}
