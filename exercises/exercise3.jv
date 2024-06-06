@@ -1,0 +1,84 @@
+// SPDX-FileCopyrightText: 2024 Friedrich-Alexander-Universitat Erlangen-Nurnberg
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
+// Describing a Goods Transported by Train pipeline
+pipeline GoodsPipeline {
+
+    GoodsExtractor -> GoodsTextFileInterpreter;
+
+    GoodsTextFileInterpreter
+        -> GoodsCSVInterpreter
+        -> GoodsCoreDataSelector
+        -> NameHeaderWriter 
+        -> GoodsTableInterpreter
+        -> GoodsLoader;
+
+    block GoodsTextFileInterpreter oftype TextFileInterpreter {
+        encoding: "utf8";
+    }
+
+    block GoodsExtractor oftype HttpExtractor {
+        url: "https://www-genesis.destatis.de/genesis/downloads/00/tables/46131-0014_00.csv";
+    }
+
+    block GoodsCSVInterpreter oftype CSVInterpreter {
+        delimiter: ';';
+    }
+
+    block GoodsCoreDataSelector oftype CellRangeSelector {
+        select: range A8:AU*;
+    }
+
+    block NameHeaderWriter oftype CellWriter {
+        at: range A1:AU1;
+        write: [
+            'year', 'month', 'goods_id', 'goods_name', 'goods_source',
+            'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+            'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK',
+            'AL', 'AM', 'AN', 'AO', 'AP', 'AQ', 'AR', 'AS', 'abroad', 'total'
+        ];
+    }
+
+    block GoodsTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            'year' oftype integer, 
+            'month' oftype monthConstraint,
+            'goods_id' oftype goodsIdConstraint,
+            'goods_name' oftype text,
+            'goods_source' oftype text,
+            'abroad' oftype positiveInteger,
+            'total' oftype positiveInteger
+        ];
+    }
+
+    block GoodsLoader oftype SQLiteLoader {
+        table: "goods";
+        file: "./goodsTransportedByTrain.sqlite";
+    }
+
+    valuetype monthConstraint oftype text {
+        constraints: [
+            CapitalizedMonth,
+        ];
+    }
+    constraint CapitalizedMonth on text:
+        value matches /^[A-ZÄÖÜ].*$/;
+
+    valuetype goodsIdConstraint oftype text {
+        constraints: [
+            GoodsIdFormat,
+        ];
+    }
+    constraint GoodsIdFormat on text:
+        value matches /^NST7-[A-Z0-9]{3}$/;
+
+    valuetype positiveInteger oftype integer {
+        constraints: [
+            PositiveValue,
+        ];
+    }
+    constraint PositiveValue on integer:
+        value > 0;
+}
