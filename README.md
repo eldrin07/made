@@ -1,6 +1,6 @@
 # Exercise Badges
 
-![](https://byob.yarr.is/eldrin07/made/score_ex1) ![](https://byob.yarr.is/eldrin07/made/score_ex2)
+![](https://byob.yarr.is/eldrin07/made/score_ex1) ![](https://byob.yarr.is/eldrin07/made/score_ex2) ![](https://byob.yarr.is/eldrin07/made/score_ex3)
 
 # Methods of Advanced Data Engineering Template Project
 
