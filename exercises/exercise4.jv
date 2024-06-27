@@ -1,0 +1,97 @@
+// SPDX-FileCopyrightText: 2024 Friedrich-Alexander-Universitat Erlangen-Nurnberg
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
+pipeline TemperaturePipeline {
+
+    TemperatureExtractor -> TemperatureUnzipper -> TemperatureFilePicker -> TemperatureTextFileInterpreter
+        -> TemperatureCSVInterpreter -> NameHeaderWriter -> TemperatureTableInterpreter 
+        -> CelsiusToFahrenheit -> CelsiusToFahrenheit2 -> TemperatureLoader;
+
+    block TemperatureExtractor oftype HttpExtractor {
+        url: "https://www.mowesta.com/data/measure/mowesta-dataset-20221107.zip";
+    }
+
+    block TemperatureUnzipper oftype ArchiveInterpreter {
+        archiveType: "zip";
+    }
+
+    block TemperatureFilePicker oftype FilePicker {
+       path: "/data.csv";
+     }
+
+     block TemperatureTextFileInterpreter oftype TextFileInterpreter {
+         encoding: "utf8";
+     }
+
+
+    //block TemperatureLocalExtractor oftype LocalFileExtractor {
+      // filePath: "data.csv";
+     //}
+
+    block TemperatureCSVInterpreter oftype CSVInterpreter {
+        delimiter: ';';
+    }
+
+    block NameHeaderWriter oftype CellWriter {
+        at: range A1:J1;
+        write: [
+            'id', 'producer', 'model', 'month', 'temperature', 'F', 'G', 'H', 'I', 'battery_temperature'
+        ];
+    }
+
+    block TemperatureTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            'id' oftype positiveInteger, 
+            'producer' oftype text,
+            'model' oftype text,
+            'month' oftype integer,
+            'temperature' oftype decimal,
+            'battery_temperature' oftype decimal
+        ];
+    }
+
+    valuetype positiveInteger oftype integer {
+        constraints: [
+            PositiveValue,
+        ];
+    }
+    constraint PositiveValue on integer:
+        value > 0;
+
+    block CelsiusToFahrenheit oftype TableTransformer {
+        inputColumns: [
+          "temperature"
+        ];
+        outputColumn: "temperature";
+        use: CelsiusTOFahr;
+      }
+
+      transform CelsiusTOFahr {
+        from celsius oftype decimal;
+        to fahrenheit oftype decimal;
+        fahrenheit:  ( (celsius * 9/5) + 32);
+      }
+
+      block CelsiusToFahrenheit2 oftype TableTransformer {
+          inputColumns: [
+            "battery_temperature"
+          ];
+          outputColumn: "battery_temperature";
+          use: CelsiusTOFahr2;
+        }
+
+        transform CelsiusTOFahr2 {
+          from celsius2 oftype decimal;
+          to fahrenheit2 oftype decimal;
+          fahrenheit2:  ( (celsius2 * 9/5) + 32);
+        }
+
+
+    block TemperatureLoader oftype SQLiteLoader {
+        table: "temperatures";
+        file: "./temperatures.sqlite";
+    }
+
+}

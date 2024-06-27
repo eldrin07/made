@@ -1,0 +1,97 @@
+// SPDX-FileCopyrightText: 2024 Friedrich-Alexander-Universitat Erlangen-Nurnberg
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
+pipeline GTFSDataPipeline {
+
+    GTFSExtractor -> GTFSUnzipper -> GTFSStopsFilePicker -> GTFSStopsTextFileInterpreter
+        -> GTFSStopsCSVInterpreter -> NameHeaderWriter
+        -> GTFSStopsValidator
+        -> GTFSStopsLoader;
+
+    // Extracts the zip file from the specified URL
+    block GTFSExtractor oftype HttpExtractor {
+        url: "https://gtfs.rhoenenergie-bus.de/GTFS.zip";
+    }
+
+    // Unzips the downloaded file
+    block GTFSUnzipper oftype ArchiveInterpreter {
+        archiveType: "zip";
+    }
+
+    // Picks the specific stops.txt file from the unzipped archive
+    block GTFSStopsFilePicker oftype FilePicker {
+        path: "/stops.txt";
+    }
+
+    // Interprets the text file with UTF-8 encoding
+    block GTFSStopsTextFileInterpreter oftype TextFileInterpreter {
+        encoding: "utf8";
+    }
+
+    // Interprets the CSV file using a comma as the delimiter
+    block GTFSStopsCSVInterpreter oftype CSVInterpreter {
+        delimiter: ',';
+    }
+
+    // Selects only the relevant columns
+
+    block NameHeaderWriter oftype CellWriter {
+        at: range A1:G1;
+        write: [
+            'stop_id', 'B', 'stop_name', 'D', 'stop_lat', 'stop_lon', 'zone_id'
+        ];
+    }
+    
+    block GTFSStopsValidator oftype TableInterpreter {
+        header: true;
+        columns: [
+            'stop_id' oftype text, 
+            'stop_name' oftype germanText,
+            'stop_lat' oftype textLatitude,
+            'stop_lon' oftype  textLongitude,
+            'zone_id' oftype particularZone
+        ];
+    }
+
+    valuetype particularZone oftype text {
+        constraints: [
+            ParticularValue,
+        ];
+    }
+    constraint ParticularValue on text:
+        value == '"1645"';
+
+    // Ensures the 'stop_name' column can handle German umlauts
+    valuetype germanText oftype text {
+        constraints: [
+            AllowGermanUmlauts,
+        ];
+    }
+    constraint AllowGermanUmlauts on text:
+        value matches /^"?[A-Za-zÄÖÜäöüß\s]+"?$/; 
+
+    // Ensures the 'stop_lat' column contains valid latitude values as text
+    valuetype textLatitude oftype text {
+        constraints: [
+            ValidTextLatitude,
+        ];
+    }
+    constraint ValidTextLatitude on text:
+        value matches /^"?-?([1-8]?\d(\.\d+)?|90(\.0+)?)"?$/;
+
+    // Ensures the 'stop_lon' column contains valid longitude values as text
+    valuetype textLongitude oftype text {
+        constraints: [
+            ValidTextLongitude,
+        ];
+    }
+    constraint ValidTextLongitude on text:
+        value matches /^"?-?((1[0-7]\d|0?\d?\d)(\.\d+)?|180(\.0+)?)"?$/; 
+
+    // Loads the validated and filtered data into a SQLite database
+    block GTFSStopsLoader oftype SQLiteLoader {
+        table: "stops";
+        file: "./gtfs.sqlite";
+    }
+}
