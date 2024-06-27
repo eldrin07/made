@@ -69,7 +69,7 @@ pipeline GTFSDataPipeline {
         ];
     }
     constraint AllowGermanUmlauts on text:
-        value matches /^"?[A-Za-zÄÖÜäöüß\s]+"?$/; 
+    value matches /^"?[A-Za-zÄÖÜäöüß\s.\-]*"?$/; 
 
     // Ensures the 'stop_lat' column contains valid latitude values as text
     valuetype textLatitude oftype text {
